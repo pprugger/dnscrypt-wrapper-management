@@ -103,6 +103,14 @@ delete_keys()
   rm $1.key $1.cert
 }
 
+check_if_server_is_running_and_restart()
+{
+    pgrep dnscrypt-wrapper
+    if [ $? -ne 0 ]; then
+      restart_server $1
+    fi
+}
+
 if [ ! -f 1.key ] && [ ! -f 2.key ]; then
   if [ ! -f $PUBLIC_KEYFILE ] && [ ! -f $SECRET_KEYFILE ]; then
     init_server
@@ -173,7 +181,7 @@ if [ -f 1.key ] && [ $age_key_1_seconds -gt $KEY_RENEWAL_INTERVAL_SECONDS ]; the
     exit
 else 
   if [ -f 1.key ]; then
-    restart_server 1
+    check_if_server_is_running_and_restart 1
     exit
   fi
 fi
@@ -184,7 +192,7 @@ if [ -f 2.key ] && [ $age_key_2_seconds -gt $KEY_RENEWAL_INTERVAL_SECONDS ]; the
     exit
 else 
   if [ -f 2.key ]; then
-    restart_server 2
+    check_if_server_is_running_and_restart 2
     exit
   fi
 fi
