@@ -105,7 +105,7 @@ delete_keys()
 
 check_if_server_is_running_and_restart()
 {
-    pgrep dnscrypt-wrapper
+    pgrep dnscrypt-wrapper 2>&1
     if [ $? -ne 0 ]; then
       restart_server $1
     fi
@@ -153,7 +153,7 @@ if [ -f 1.key ] && [ -f 2.key ]; then
     else
       echo "Key 1 older than key 2, deleting key 1..." >> $logfile
       echo "Creating new key 1 and restart server with both keys" >> $logfile
-      delete_keys 2
+      delete_keys 1
       create_keys 1
       restart_server_both_keys
       exit
