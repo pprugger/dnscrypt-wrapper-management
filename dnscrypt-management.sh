@@ -3,6 +3,7 @@
 ########################################
 path=/usr/local/etc/dnscrypt-wrapper/
 logfile=/var/log/dnscrypt-wrapper.log
+binpath=/usr/local/sbin/dnscrypt-wrapper 
 LISTEN=192.168.78.50
 PORT=53000
 RESOLVER=9.9.9.9:53
@@ -56,8 +57,8 @@ init_server()
   echo "First server start, initialising..." >> $logfile
   echo "No keys found, initialising" >> $logfile
   echo "Generating provider keypair" >> $logfile
-  dnscrypt-wrapper --gen-provider-keypair --provider-publickey-file=$PUBLIC_KEYFILE --provider-secretkey-file=$SECRET_KEYFILE -l $logfile
-  dnscrypt-wrapper --show-provider-publickey >> $logfile
+  $binpath --gen-provider-keypair --provider-publickey-file=$PUBLIC_KEYFILE --provider-secretkey-file=$SECRET_KEYFILE -l $logfile
+  $binpath --show-provider-publickey >> $logfile
   chmod 640 $PUBLIC_KEYFILE
   chmod 640 $SECRET_KEYFILE
   create_keys 1
@@ -67,9 +68,9 @@ init_server()
 
 start_server()
 {
-  pkill dnscrypt-wrapper
+  pkill dnscrypt-wrapper 
   tcpdrop -a -l | grep $PORT | sh 2>&1
-	dnscrypt-wrapper --resolver-address=$RESOLVER --listen-address=$LISTEN:$PORT --provider-name=$PROVIDER_NAME --crypt-secretkey-file=$1.key --provider-cert-file=$1.cert -d -l $logfile
+	$binpath --resolver-address=$RESOLVER --listen-address=$LISTEN:$PORT --provider-name=$PROVIDER_NAME --crypt-secretkey-file=$1.key --provider-cert-file=$1.cert -d -l $logfile
 }
 
 restart_server()
@@ -82,17 +83,17 @@ restart_server_both_keys()
 {
   echo "" >> $logfile
   echo "Restarting dnscrypt-wrapper with both certificates" >> $logfile
-  pkill dnscrypt-wrapper
+  pkill dnscrypt-wrapper 
   tcpdrop -a -l | grep $PORT | sh 2>&1
-	dnscrypt-wrapper --resolver-address=$RESOLVER --listen-address=$LISTEN:$PORT --provider-name=$PROVIDER_NAME --crypt-secretkey-file=1.key,2.key --provider-cert-file=1.cert,2.cert -d -l $logfile
+	$binpath --resolver-address=$RESOLVER --listen-address=$LISTEN:$PORT --provider-name=$PROVIDER_NAME --crypt-secretkey-file=1.key,2.key --provider-cert-file=1.cert,2.cert -d -l $logfile
 }
 
 create_keys()
 {
   echo "" >> $logfile
   echo "Generating new key $1.key and certificate $1.cert" >> $logfile
-  dnscrypt-wrapper --gen-crypt-keypair --crypt-secretkey-file=$1.key -l $logfile
-  dnscrypt-wrapper --gen-cert-file --crypt-secretkey-file=$1.key --provider-cert-file=$1.cert --provider-publickey-file=$PUBLIC_KEYFILE --provider-secretkey-file=$SECRET_KEYFILE --cert-file-expire-days=$CERT_EXPIRE_DAYS -l $logfile
+  $binpath --gen-crypt-keypair --crypt-secretkey-file=$1.key -l $logfile
+  $binpath --gen-cert-file --crypt-secretkey-file=$1.key --provider-cert-file=$1.cert --provider-publickey-file=$PUBLIC_KEYFILE --provider-secretkey-file=$SECRET_KEYFILE --cert-file-expire-days=$CERT_EXPIRE_DAYS -l $logfile
   chmod 640 $1.key
   chmod 640 $1.cert
 }
@@ -111,7 +112,7 @@ fi
 
 if [ ! -f 1.key ] && [ ! -f 2.key ]; then
   create_keys 1
-  dnscrypt-wrapper --show-provider-publickey >> $logfile
+  $binpath --show-provider-publickey >> $logfile
   start_server 1
 fi
 
@@ -170,11 +171,21 @@ if [ -f 1.key ] && [ $age_key_1_seconds -gt $KEY_RENEWAL_INTERVAL_SECONDS ]; the
     create_keys 2
     restart_server_both_keys
     exit
+else 
+  if [ -f 1.key ]; then
+    restart_server 1
+    exit
+  fi
 fi
 
 if [ -f 2.key ] && [ $age_key_2_seconds -gt $KEY_RENEWAL_INTERVAL_SECONDS ]; then
     create_keys 1
     restart_server_both_keys
     exit
+else 
+  if [ -f 2.key ]; then
+    restart_server 2
+    exit
+  fi
 fi
 
