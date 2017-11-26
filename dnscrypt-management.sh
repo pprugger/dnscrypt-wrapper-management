@@ -13,6 +13,7 @@ PUBLIC_KEYFILE=public.key
 SECRET_KEYFILE=secret.key
 KEY_RENEWAL_INTERVAL_SECONDS=7200 
 CLIENT_RENEWAL_INTERVAL_SECONDS=3800 #Remember clients only check every 3600 seconds for new certificates, give them a bit more time..
+SERVER_RESTART_SLEEP_SECONDS=5
 #######################################
 
 UPDATE_INTERVAL_SECONDS=$(($KEY_RENEWAL_INTERVAL_SECONDS-$CLIENT_RENEWAL_INTERVAL_SECONDS))
@@ -69,7 +70,9 @@ init_server()
 start_server()
 {
   pkill dnscrypt-wrapper 
-  tcpdrop -a -l | grep $PORT | sh 2>&1
+  sleep $SERVER_RESTART_SLEEP_SECONDS
+  tcpdrop -a -l | grep $PORT | sh
+  sleep $SERVER_RESTART_SLEEP_SECONDS
 	$binpath --resolver-address=$RESOLVER --listen-address=$LISTEN:$PORT --provider-name=$PROVIDER_NAME --crypt-secretkey-file=$1.key --provider-cert-file=$1.cert -d -l $logfile
 }
 
@@ -84,7 +87,9 @@ restart_server_both_keys()
   echo "" >> $logfile
   echo "Restarting dnscrypt-wrapper with both certificates" >> $logfile
   pkill dnscrypt-wrapper 
-  tcpdrop -a -l | grep $PORT | sh 2>&1
+  sleep $SERVER_RESTART_SLEEP_SECONDS
+  tcpdrop -a -l | grep $PORT | sh
+  sleep $SERVER_RESTART_SLEEP_SECONDS
 	$binpath --resolver-address=$RESOLVER --listen-address=$LISTEN:$PORT --provider-name=$PROVIDER_NAME --crypt-secretkey-file=1.key,2.key --provider-cert-file=1.cert,2.cert -d -l $logfile
 }
 
