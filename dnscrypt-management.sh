@@ -13,7 +13,7 @@ PUBLIC_KEYFILE=public.key
 SECRET_KEYFILE=secret.key
 KEY_RENEWAL_INTERVAL_SECONDS=7000 
 CLIENT_RENEWAL_INTERVAL_SECONDS=3800 #Remember clients only check every 3600 seconds for new certificates, give them a bit more time..
-SERVER_RESTART_SLEEP_SECONDS=10
+TCP_DROP_SLEEP_SECONDS=5
 #######################################
 
 UPDATE_INTERVAL_SECONDS=$(($KEY_RENEWAL_INTERVAL_SECONDS-$CLIENT_RENEWAL_INTERVAL_SECONDS))
@@ -70,22 +70,27 @@ init_server()
 kill_server()
 {
   pkill dnscrypt-wrapper 
-  tcpdrop -a -l | grep $PORT | sh       #Try do drop
-  sleep $SERVER_RESTART_SLEEP_SECONDS
-  tcpdrop -a -l | grep $PORT | sh       #Second try do drop
-  sleep $SERVER_RESTART_SLEEP_SECONDS
+  i=`sockstat -p $PORT -4 | wc -l`
+  
+  while [ $i -gt 1 ]
+  do
+	tcpdrop -a -l | grep $PORT | sh >> $logfile
+	sleep $TCP_DROP_SLEEP_SECONDS
+	i=`sockstat -p $PORT -4 | wc -l`
+  done
+  echo "`date` All connections dropped" >> $logfile
 }
 
 start_server()
 {
   kill_server
-	$binpath --resolver-address=$RESOLVER --listen-address=$LISTEN:$PORT --provider-name=$PROVIDER_NAME --crypt-secretkey-file=$1.key --provider-cert-file=$1.cert -d -l $logfile
+  $binpath --resolver-address=$RESOLVER --listen-address=$LISTEN:$PORT --provider-name=$PROVIDER_NAME --crypt-secretkey-file=$1.key --provider-cert-file=$1.cert -d -l $logfile
 }
 
 restart_server()
 {
   echo "`date` Restarting with $1.key" >> $logfile
-	start_server $1
+  start_server $1
 }
 
 restart_server_both_keys()
@@ -93,7 +98,7 @@ restart_server_both_keys()
   echo "" >> $logfile
   echo "`date` Restarting dnscrypt-wrapper with both certificates" >> $logfile
   kill_server
-	$binpath --resolver-address=$RESOLVER --listen-address=$LISTEN:$PORT --provider-name=$PROVIDER_NAME --crypt-secretkey-file=1.key,2.key --provider-cert-file=1.cert,2.cert -d -l $logfile
+  $binpath --resolver-address=$RESOLVER --listen-address=$LISTEN:$PORT --provider-name=$PROVIDER_NAME --crypt-secretkey-file=1.key,2.key --provider-cert-file=1.cert,2.cert -d -l $logfile
 }
 
 create_keys()
@@ -101,8 +106,7 @@ create_keys()
   echo "" >> $logfile
   echo "Generating new key $1.key and certificate $1.cert" >> $logfile
   $binpath --gen-crypt-keypair --crypt-secretkey-file=$1.key -l $logfile > /dev/null
-  $binpath --gen-cert-file --crypt-secretkey-file=$1.key --provider-cert-file=$1.cert --provider-publickey-file=$PUBLIC_KEYFILE > /dev/null 
---provider-secretkey-file=$SECRET_KEYFILE --cert-file-expire-days=$CERT_EXPIRE_DAYS -l $logfile > /dev/null
+  $binpath --gen-cert-file --crypt-secretkey-file=$1.key --provider-cert-file=$1.cert --provider-publickey-file=$PUBLIC_KEYFILE > /dev/null --provider-secretkey-file=$SECRET_KEYFILE --cert-file-expire-days=$CERT_EXPIRE_DAYS -l $logfile > /dev/null
   chmod 640 $1.key
   chmod 640 $1.cert
 }
