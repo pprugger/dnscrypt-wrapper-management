@@ -11,9 +11,9 @@ PROVIDER_NAME=2.dnscrypt.uname
 CERT_EXPIRE_DAYS=1
 PUBLIC_KEYFILE=public.key
 SECRET_KEYFILE=secret.key
-KEY_RENEWAL_INTERVAL_SECONDS=7200 
+KEY_RENEWAL_INTERVAL_SECONDS=7000 
 CLIENT_RENEWAL_INTERVAL_SECONDS=3800 #Remember clients only check every 3600 seconds for new certificates, give them a bit more time..
-SERVER_RESTART_SLEEP_SECONDS=5
+SERVER_RESTART_SLEEP_SECONDS=10
 #######################################
 
 UPDATE_INTERVAL_SECONDS=$(($KEY_RENEWAL_INTERVAL_SECONDS-$CLIENT_RENEWAL_INTERVAL_SECONDS))
@@ -63,33 +63,36 @@ init_server()
   chmod 640 $PUBLIC_KEYFILE
   chmod 640 $SECRET_KEYFILE
   create_keys 1
-  echo "Starting dnscrypt-wrapper"
+  echo "`date` Starting dnscrypt-wrapper"
   start_server 1
+}
+
+kill_server()
+{
+  pkill dnscrypt-wrapper 
+  tcpdrop -a -l | grep $PORT | sh       #Try do drop
+  sleep $SERVER_RESTART_SLEEP_SECONDS
+  tcpdrop -a -l | grep $PORT | sh       #Second try do drop
+  sleep $SERVER_RESTART_SLEEP_SECONDS
 }
 
 start_server()
 {
-  pkill dnscrypt-wrapper 
-  sleep $SERVER_RESTART_SLEEP_SECONDS
-  tcpdrop -a -l | grep $PORT | sh
-  sleep $SERVER_RESTART_SLEEP_SECONDS
+  kill_server
 	$binpath --resolver-address=$RESOLVER --listen-address=$LISTEN:$PORT --provider-name=$PROVIDER_NAME --crypt-secretkey-file=$1.key --provider-cert-file=$1.cert -d -l $logfile
 }
 
 restart_server()
 {
-  echo "Restarting with $1.key" >> $logfile
+  echo "`date` Restarting with $1.key" >> $logfile
 	start_server $1
 }
 
 restart_server_both_keys()
 {
   echo "" >> $logfile
-  echo "Restarting dnscrypt-wrapper with both certificates" >> $logfile
-  pkill dnscrypt-wrapper 
-  sleep $SERVER_RESTART_SLEEP_SECONDS
-  tcpdrop -a -l | grep $PORT | sh
-  sleep $SERVER_RESTART_SLEEP_SECONDS
+  echo "`date` Restarting dnscrypt-wrapper with both certificates" >> $logfile
+  kill_server
 	$binpath --resolver-address=$RESOLVER --listen-address=$LISTEN:$PORT --provider-name=$PROVIDER_NAME --crypt-secretkey-file=1.key,2.key --provider-cert-file=1.cert,2.cert -d -l $logfile
 }
 
@@ -97,8 +100,9 @@ create_keys()
 {
   echo "" >> $logfile
   echo "Generating new key $1.key and certificate $1.cert" >> $logfile
-  $binpath --gen-crypt-keypair --crypt-secretkey-file=$1.key -l $logfile
-  $binpath --gen-cert-file --crypt-secretkey-file=$1.key --provider-cert-file=$1.cert --provider-publickey-file=$PUBLIC_KEYFILE --provider-secretkey-file=$SECRET_KEYFILE --cert-file-expire-days=$CERT_EXPIRE_DAYS -l $logfile
+  $binpath --gen-crypt-keypair --crypt-secretkey-file=$1.key -l $logfile > /dev/null
+  $binpath --gen-cert-file --crypt-secretkey-file=$1.key --provider-cert-file=$1.cert --provider-publickey-file=$PUBLIC_KEYFILE > /dev/null 
+--provider-secretkey-file=$SECRET_KEYFILE --cert-file-expire-days=$CERT_EXPIRE_DAYS -l $logfile > /dev/null
   chmod 640 $1.key
   chmod 640 $1.cert
 }
@@ -110,8 +114,9 @@ delete_keys()
 
 check_if_server_is_running_and_restart()
 {
-    pgrep dnscrypt-wrapper 2>&1
+    pgrep dnscrypt-wrapper > /dev/null
     if [ $? -ne 0 ]; then
+	  echo "`date` Server not running!" >> $logfile
       restart_server $1
     fi
 }
@@ -147,17 +152,17 @@ if [ -f 1.key ] && [ -f 2.key ]; then
 	echo "Both keys found, checking..." >> $logfile
   
   if [ $age_key_1_seconds -gt $KEY_RENEWAL_INTERVAL_SECONDS ] && [ $age_key_2_seconds -gt $KEY_RENEWAL_INTERVAL_SECONDS ]; then
-    echo "Both Keys to old" >> $logfile
+    echo "`date` Both Keys to old" >> $logfile
     if [ $age_key_2_seconds -gt $age_key_1_seconds ]; then
-      echo "Key 2 older than key 1, deleting key 2..." >> $logfile
-      echo "Creating new key 2 and restart server with both keys" >> $logfile
+      echo "`date` Key 2 older than key 1, deleting key 2..." >> $logfile
+      echo "`date` Creating new key 2 and restart server with both keys" >> $logfile
       delete_keys 2
       create_keys 2
       restart_server_both_keys
       exit
     else
-      echo "Key 1 older than key 2, deleting key 1..." >> $logfile
-      echo "Creating new key 1 and restart server with both keys" >> $logfile
+      echo "`date` Key 1 older than key 2, deleting key 1..." >> $logfile
+      echo "`date` Creating new key 1 and restart server with both keys" >> $logfile
       delete_keys 1
       create_keys 1
       restart_server_both_keys
@@ -166,13 +171,13 @@ if [ -f 1.key ] && [ -f 2.key ]; then
   fi
   
   if [ $age_key_2_seconds -gt $age_key_1_seconds ] && [ $age_key_2_seconds -gt $CLIENT_RENEWAL_INTERVAL_SECONDS ]; then
-      echo "Clients had enough time to update, deleting key 2" >> $logfile
+      echo "`date` Clients had enough time to update, deleting key 2" >> $logfile
       delete_keys 2
       restart_server 1
 			exit
   else 
       if [ $age_key_1_seconds -gt $age_key_2_seconds ] && [ $age_key_1_seconds -gt $CLIENT_RENEWAL_INTERVAL_SECONDS ]; then
-        echo "Clients had enough time to update, deleting key 1" >> $logfile
+        echo "`date` Clients had enough time to update, deleting key 1" >> $logfile
         delete_keys 1
         restart_server 2
         exit
