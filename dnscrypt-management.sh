@@ -70,7 +70,7 @@ init_server()
 kill_server()
 {
   pkill dnscrypt-wrapper 
-  i=`sockstat -p $PORT -4 | wc -l`
+  i=`sockstat -p $PORT -4 -6 | wc -l`
   
   while [ $i -gt 1 ]
   do
@@ -89,8 +89,8 @@ start_server()
 
 restart_server()
 {
-  echo "`date` Restarting with $1.key" >> $logfile
   start_server $1
+  echo "`date` Restarting with $1.key" >> $logfile
 }
 
 restart_server_both_keys()
@@ -174,16 +174,16 @@ if [ -f 1.key ] && [ -f 2.key ]; then
     fi
   fi
   
-  if [ $age_key_2_seconds -lt $age_key_1_seconds ] && [ $age_key_2_seconds -gt $CLIENT_RENEWAL_INTERVAL_SECONDS ]; then
-      echo "`date` Clients had enough time to update, deleting key 1" >> $logfile
-      delete_keys 1
-      restart_server 2
+  if [ $age_key_2_seconds -gt $age_key_1_seconds ] && [ $age_key_2_seconds -gt $CLIENT_RENEWAL_INTERVAL_SECONDS ]; then
+      echo "`date` Clients had enough time to update, deleting key 2" >> $logfile
+      delete_keys 2
+      restart_server 1
       exit
   else 
-      if [ $age_key_1_seconds -lt $age_key_2_seconds ] && [ $age_key_1_seconds -gt $CLIENT_RENEWAL_INTERVAL_SECONDS ]; then
-        echo "`date` Clients had enough time to update, deleting key 2" >> $logfile
-        delete_keys 2
-        restart_server 1
+      if [ $age_key_1_seconds -gt $age_key_2_seconds ] && [ $age_key_1_seconds -gt $CLIENT_RENEWAL_INTERVAL_SECONDS ]; then
+        echo "`date` Clients had enough time to update, deleting key 1" >> $logfile
+        delete_keys 1
+        restart_server 2
         exit
       fi
   fi
