@@ -74,9 +74,9 @@ kill_server()
   
   while [ $i -gt 1 ]
   do
-	tcpdrop -a -l | grep $PORT | sh >> $logfile
-	sleep $TCP_DROP_SLEEP_SECONDS
-	i=`sockstat -p $PORT -4 | wc -l`
+    tcpdrop -a -l | grep $PORT | sh > /dev/null 2>&1
+    sleep $TCP_DROP_SLEEP_SECONDS
+    i=`sockstat -p $PORT -4 | wc -l`
   done
   echo "`date` All connections dropped" >> $logfile
 }
@@ -174,16 +174,16 @@ if [ -f 1.key ] && [ -f 2.key ]; then
     fi
   fi
   
-  if [ $age_key_2_seconds -gt $age_key_1_seconds ] && [ $age_key_2_seconds -gt $CLIENT_RENEWAL_INTERVAL_SECONDS ]; then
-      echo "`date` Clients had enough time to update, deleting key 2" >> $logfile
-      delete_keys 2
-      restart_server 1
-			exit
+  if [ $age_key_2_seconds -lt $age_key_1_seconds ] && [ $age_key_2_seconds -gt $CLIENT_RENEWAL_INTERVAL_SECONDS ]; then
+      echo "`date` Clients had enough time to update, deleting key 1" >> $logfile
+      delete_keys 1
+      restart_server 2
+      exit
   else 
-      if [ $age_key_1_seconds -gt $age_key_2_seconds ] && [ $age_key_1_seconds -gt $CLIENT_RENEWAL_INTERVAL_SECONDS ]; then
-        echo "`date` Clients had enough time to update, deleting key 1" >> $logfile
-        delete_keys 1
-        restart_server 2
+      if [ $age_key_1_seconds -lt $age_key_2_seconds ] && [ $age_key_1_seconds -gt $CLIENT_RENEWAL_INTERVAL_SECONDS ]; then
+        echo "`date` Clients had enough time to update, deleting key 2" >> $logfile
+        delete_keys 2
+        restart_server 1
         exit
       fi
   fi
