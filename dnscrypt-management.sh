@@ -104,7 +104,7 @@ restart_server_both_keys()
 create_keys()
 {
   echo "" >> $logfile
-  echo "Generating new key $1.key and certificate $1.cert" >> $logfile
+  echo "`date` Generating new key $1.key and certificate $1.cert" >> $logfile
   $binpath --gen-crypt-keypair --crypt-secretkey-file=$1.key -l $logfile > /dev/null
   $binpath --gen-cert-file --crypt-secretkey-file=$1.key --provider-cert-file=$1.cert --provider-publickey-file=$PUBLIC_KEYFILE > /dev/null --provider-secretkey-file=$SECRET_KEYFILE --cert-file-expire-days=$CERT_EXPIRE_DAYS -l $logfile > /dev/null
   chmod 640 $1.key
@@ -153,7 +153,7 @@ fi
 
 if [ -f 1.key ] && [ -f 2.key ]; then
 
-	echo "Both keys found, checking..." >> $logfile
+	echo "`date` Both keys found, checking..." >> $logfile
   
   if [ $age_key_1_seconds -gt $KEY_RENEWAL_INTERVAL_SECONDS ] && [ $age_key_2_seconds -gt $KEY_RENEWAL_INTERVAL_SECONDS ]; then
     echo "`date` Both Keys to old" >> $logfile
@@ -174,40 +174,43 @@ if [ -f 1.key ] && [ -f 2.key ]; then
     fi
   fi
   
-  if [ $age_key_2_seconds -gt $age_key_1_seconds ] && [ $age_key_2_seconds -gt $CLIENT_RENEWAL_INTERVAL_SECONDS ]; then
-      echo "`date` Clients had enough time to update, deleting key 2" >> $logfile
-      delete_keys 2
-      restart_server 1
+  if [ $age_key_1_seconds -gt $age_key_2_seconds ] && [ $age_key_2_seconds -gt $CLIENT_RENEWAL_INTERVAL_SECONDS ]; then
+      echo "`date` Clients had enough time to update, deleting key 1" >> $logfile
+      delete_keys 1
+      restart_server 2
       exit
   else 
-      if [ $age_key_1_seconds -gt $age_key_2_seconds ] && [ $age_key_1_seconds -gt $CLIENT_RENEWAL_INTERVAL_SECONDS ]; then
-        echo "`date` Clients had enough time to update, deleting key 1" >> $logfile
-        delete_keys 1
-        restart_server 2
+      if [ $age_key_2_seconds -gt $age_key_1_seconds ] && [ $age_key_1_seconds -gt $CLIENT_RENEWAL_INTERVAL_SECONDS ]; then
+        echo "`date` Clients had enough time to update, deleting key 2" >> $logfile
+        delete_keys 2
+        restart_server 1
         exit
       fi
   fi
 fi
 
-if [ -f 1.key ] && [ $age_key_1_seconds -gt $KEY_RENEWAL_INTERVAL_SECONDS ]; then
+if [ ! -f 2.key ]; then
+  if [ -f 1.key ] && [ $age_key_1_seconds -gt $KEY_RENEWAL_INTERVAL_SECONDS ]; then
     create_keys 2
     restart_server_both_keys
     exit
-else 
-  if [ -f 1.key ]; then
-    check_if_server_is_running_and_restart 1
-    exit
+  else 
+    if [ -f 1.key ]; then
+      check_if_server_is_running_and_restart 1
+      exit
+    fi
   fi
 fi
 
-if [ -f 2.key ] && [ $age_key_2_seconds -gt $KEY_RENEWAL_INTERVAL_SECONDS ]; then
+if [ ! -f 1.key ]; then
+  if [ -f 2.key ] && [ $age_key_2_seconds -gt $KEY_RENEWAL_INTERVAL_SECONDS ]; then
     create_keys 1
     restart_server_both_keys
     exit
-else 
-  if [ -f 2.key ]; then
-    check_if_server_is_running_and_restart 2
-    exit
+  else 
+    if [ -f 2.key ]; then
+      check_if_server_is_running_and_restart 2
+      exit
+    fi
   fi
 fi
-
